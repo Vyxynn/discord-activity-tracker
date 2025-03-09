@@ -62,40 +62,55 @@ client.on('presenceUpdate', (oldPresence, newPresence) => {
     }
 
     const currentActivity = newPresence.activities[0];  // Take only the most recent activity
+    const currentTime = Date.now();  // Current timestamp
 
     // Initialize or update user activities if they don't exist yet
     if (!userActivities[userId]) {
-        userActivities[userId] = { activities: [{ name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }] };
+        userActivities[userId] = {
+            activities: [{ name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }, { name: "No data", type: "No data", details: "No data" }],
+            lastActivityChange: currentTime // Track last activity change timestamp
+        };
     }
 
-    // Only shift activities when the current activity is different from the previous one
-    if (!oldPresence || oldPresence.activities[0]?.name !== currentActivity.name || oldPresence.activities[0]?.details !== currentActivity.details) {
+    // Check if the current activity is the same as the previous one
+    const prevActivity = userActivities[userId].activities[0];
+    const timeDifference = currentTime - userActivities[userId].lastActivityChange;
+
+    // Condition for "straight to the same activity" OR "1-minute interval"
+    if ((prevActivity.name === currentActivity.name) || (timeDifference >= 60000)) {
+        console.log('Same activity detected or 1-minute interval passed.');
+
+        // If it's the same activity, just update the current activity without shifting
+        userActivities[userId].activities[0] = { name: currentActivity.name, type: currentActivity.type, details: currentActivity.details };
+        console.log(`Updated current activity for ${userId}:`, userActivities[userId]);
+    } else {
+        // Otherwise, shift the activities and add the new one to the top
         console.log('Activity change detected!');
 
-        // Shift activities only if the current activity is valid (not "No data")
         if (userActivities[userId].activities[0].name !== "No data") {
-            // Shift the activities down and add the current one to index 0
             const newActivities = [
                 { name: currentActivity.name, type: currentActivity.type, details: currentActivity.details },
                 ...userActivities[userId].activities.slice(0, 3)  // Keep the last 3 activities
             ];
 
-            // Fill any remaining slots with "No data" if less than 4 activities
+            // Ensure there are always 4 activities, filling with "No data" if necessary
             while (newActivities.length < 4) {
                 newActivities.push({ name: "No data", type: "No data", details: "No data" });
             }
 
-            // Store the updated activities
             userActivities[userId].activities = newActivities;
             console.log(`Updated activities for ${userId}:`, userActivities[userId]);
-            saveData(); // Save the updated data to the file
         } else {
             // If the current activity is "No data", just update index 0
             userActivities[userId].activities[0] = { name: currentActivity.name, type: currentActivity.type, details: currentActivity.details };
             console.log(`Updated current activity for ${userId}:`, userActivities[userId]);
-            saveData(); // Save the updated data to the file
         }
     }
+
+    // Update the last activity change timestamp
+    userActivities[userId].lastActivityChange = currentTime;
+
+    saveData(); // Save the updated data to the file
 });
 
 // When a user joins a server, initialize their activities
